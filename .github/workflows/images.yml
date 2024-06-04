@@ -7,7 +7,7 @@ on:
     branches:
       - master
     paths:
-      - **
+      - /**
 jobs:
   push:
     name: "images:java_${{ matrix.tag }}"
