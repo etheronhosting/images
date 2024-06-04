@@ -25,6 +25,6 @@ ENV USER=container HOME=/home/container
 
 WORKDIR /home/container
 
-COPY ./java/prompt.py /java/prompt.py
-COPY ./java/entrypoint.sh /java/entrypoint.sh
+COPY ./prompt.py /prompt.py
+COPY ./entrypoint.sh /entrypoint.sh
 CMD [ "/bin/bash", "/entrypoint.sh" ]
