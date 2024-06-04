@@ -21,8 +21,8 @@ If the user doesn't select their version inside 30 seconds, it'll default to the
 
 This should work with any existing egg, as long as you update the Docker image for the server, or the egg.
 
-You can switch an individual game server to this image by navigating to admin area > Servers > your server > Startup and changing the image field in the Docker Container Configuration section to `quay.io/wisp/images:java`.
+You can switch an individual game server to this image by navigating to admin area > Servers > your server > Startup and changing the image field in the Docker Container Configuration section to `ghcr.io/etheronhosting/images:java_java`.
 
-If you want to default all new servers to use this image (or if you're on WISP, it'll also update all existing servers to use that image), all that you need to do is navigate to admin area > Nests > your nest > your egg and change the Docker Image field to `quay.io/wisp/images:java`.
+If you want to default all new servers to use this image (or if you're on WISP, it'll also update all existing servers to use that image), all that you need to do is navigate to admin area > Nests > your nest > your egg and change the Docker Image field to `ghcr.io/etheronhosting/images:java_java`.
 
 You may also need to rebuild the server container (in admin area of the server, manage tab) to apply the changes for both of these changes.
