@@ -5,13 +5,16 @@ import struct
 import zipfile
 import hashlib
 import json
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 def getFlag(name, default):
     search = "--%s=" % name
     for x in sys.argv:
         if x.startswith(search):
             return x[len(search):]
-
     return default
 
 def getHeader(data, header, separator = ":"):
@@ -19,11 +22,9 @@ def getHeader(data, header, separator = ":"):
         splitted = x.strip().split(separator)
         if len(splitted) != 2:
             continue
-
         key, value = splitted
         if key.lower() == header.lower():
             return value.strip()
-
     raise Exception("Couldn't find header " + header)
 
 def readClassHeader(zip, path):
@@ -31,57 +32,46 @@ def readClassHeader(zip, path):
         header = class_data.read(4)
         if header != b"\xca\xfe\xba\xbe":
             raise Exception("Magic header of java class is not CAFEBABE?")
-
         class_data.read(2) # minor_version, we don't care about this
         major_version, = struct.unpack('>H', class_data.read(2))
-
         return major_version
 
 def getJavaVersion(zip):
-    # Some jars are already pre-built and their build tools just merge the mojang jar into it,
-    # leading to some false positives. This tries to mitigate this by detecting the mojang jar inside.
-    # TODO: Though for some reason, some of them could be built with Java 8, others with e.g. Java 16???
     max_version = 0
     for x in zip.namelist():
         if (x.startswith("net/minecraft/") or x.startswith("io/")) and x.endswith(".class"):
             max_version = max(max_version, readClassHeader(zip, x))
-
     if max_version != 0:
         return max_version
-
-    # Otherwise, fall back to the main class
     manifest_data = zip.read("META-INF/MANIFEST.MF").decode()
     main_class_path = getHeader(manifest_data, "Main-Class")
-
     return readClassHeader(zip, main_class_path.replace(".", "/") + ".class")
 
 def getVersionFromPaperclip(zip):
     try:
         with zip.open("patch.properties") as patch_properties:
             return getHeader(patch_properties.read().decode(), "version", "=")
-    except:
-        pass
+    except Exception as e:
+        logging.debug(f"Error reading patch.properties: {e}")
 
     try:
         with zip.open("patch.json") as patch_json:
             patch_contents = patch_json.read().decode()
             return json.loads(patch_contents)["version"]
-    except:
-        pass
+    except Exception as e:
+        logging.debug(f"Error reading patch.json: {e}")
 
     try:
-        # the version.json manifest also has the java_version field but this is a bit inaccurate as we aren't guaranteed to have that version, so prefer our logic instead
         with zip.open("version.json") as version_json:
             version_contents = version_json.read().decode()
             return json.loads(version_contents)["id"]
-    except:
-        pass
+    except Exception as e:
+        logging.debug(f"Error reading version.json: {e}")
 
 def getPaperRecommendedVersion(zip):
     version = getVersionFromPaperclip(zip)
     if not version:
         return
-
     splitted = list(map(int, version.split(".")))
     major, minor = [splitted[0], splitted[1]]
     if major >= 1 and minor >= 21:
@@ -96,17 +86,17 @@ def getPaperRecommendedVersion(zip):
         return "Java 8"
 
 def getJavaName(zip):
-    # If we're able to detect that the server uses paper (or fork of it), prefer their recommended versions over target.
-    try:
-        paper_recommended = getPaperRecommendedVersion(zip)
-        if paper_recommended:
-            return paper_recommended
-    except Exception as e:
-        pass
+    # try:
+    #     paper_recommended = getPaperRecommendedVersion(zip)
+    #     if paper_recommended:
+    #         logging.debug(f"Detected Paper recommended version: {paper_recommended}")
+    #         return paper_recommended
+    # except Exception as e:
+    #     logging.error(f"Error detecting Paper recommended version: {e}")
 
-    # Otherwise, just fallback to checking which version of java the files were built with.
     try:
         major_version = getJavaVersion(zip)
+        logging.debug(f"Detected Java major version: {major_version}")
         if major_version >= 65:
             return "Java 21"
         if major_version >= 61:
@@ -118,7 +108,8 @@ def getJavaName(zip):
         else:
             return "Java 8"
     except Exception as e:
-        pass
+        logging.error(f"Error detecting Java version: {e}")
+        return "Unknown Java Version"
 
 startup = os.getenv("MODIFIED_STARTUP", os.getenv("STARTUP", ""))
 def getJarFromStartup():
@@ -130,7 +121,6 @@ def getJarFromStartup():
 def replaceStartupWith(entrypoint):
     splitted = startup.split(" ")
     splitted[0] = entrypoint
-
     return " ".join(splitted)
 
 def interrupt(signum, frame):
@@ -142,11 +132,9 @@ def inputWithTimeout(timeout):
     try:
         res = input()
         signal.alarm(0)
-
         return res
     except:
         signal.alarm(0)
-
         return None
 
 def getFileChecksum(path):
@@ -154,7 +142,6 @@ def getFileChecksum(path):
         file_hash = hashlib.md5()
         while chunk := f.read(8192):
             file_hash.update(chunk)
-
         return file_hash.digest()
 
 def readFile(path):
@@ -193,11 +180,8 @@ def main():
             print("No jar detected in startup arguments - not enforcing java.")
         elif is_env:
             print(startup)
-
         return
 
-    # TODO: quilt's startup jars have nothing in them and is handled instead by MANIFEST.MF pointing to libraries - we'd need more advanced logic for this
-    # but for now just assume server.jar will exist.
     if jar == "quilt-server-launch.jar":
         jar = "server.jar"
 
@@ -235,7 +219,6 @@ def main():
                     answer = inputWithTimeout(30)
                     if answer is None:
                         answer = "1"
-                        # timedOut = True # Technically, this should be set to true but we want to default to automatic always if possible
 
                     if answer.endswith(")"):
                         answer = answer[:-1]
@@ -265,14 +248,12 @@ def main():
             if os.path.exists(save_file):
                 name = readFile(save_file).decode().strip()
 
-                # users can overwrite the file - if they do and its not java* may as well just default to something else
                 if name not in entrypointMappings:
                     if is_echo:
                         print("Detected invalid java version '%s', defaulting back to '%s'..." % name % default)
                         print("This choice can be reset by deleting the '%s' file." % state_file)
                     elif is_env:
                         print(replaceStartupWith(entrypointMappings[default]))
-
                     return
 
                 if is_echo:
@@ -280,7 +261,6 @@ def main():
                     print("This choice can be reset by deleting the '%s' file." % state_file)
                 elif is_env:
                     print(replaceStartupWith(entrypointMappings[name]))
-
                 return
 
             if is_echo:
@@ -290,7 +270,7 @@ def main():
                 print(replaceStartupWith(entrypointMappings[name]))
     except Exception as e:
         if is_echo:
-            print("Couldn't detect jar version - defaulting to '%s'." % default)
+            print(f"Couldn't detect jar version - defaulting to '{default}'. Error: {e}")
         elif is_env:
             print(replaceStartupWith(entrypointMappings[default]))
 
