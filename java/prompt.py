@@ -64,7 +64,7 @@ def getVersionFromPaperclip(zip):
     try:
         with zip.open("version.json") as version_json:
             version_contents = version_json.read().decode()
-            return json.loads(version_contents)["id"]
+            return json.loads(version_contents)["java_version"]
     except Exception as e:
         logging.debug(f"Error reading version.json: {e}")
 
