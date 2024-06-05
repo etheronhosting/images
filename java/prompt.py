@@ -36,16 +36,7 @@ def readClassHeader(zip, path):
         major_version, = struct.unpack('>H', class_data.read(2))
         return major_version
 
-def getJavaVersion(zip):
-    max_version = 0
-    for x in zip.namelist():
-        if (x.startswith("net/minecraft/") or x.startswith("io/")) and x.endswith(".class"):
-            max_version = max(max_version, readClassHeader(zip, x))
-    if max_version != 0:
-        return max_version
-    manifest_data = zip.read("META-INF/MANIFEST.MF").decode()
-    main_class_path = getHeader(manifest_data, "Main-Class")
-    return readClassHeader(zip, main_class_path.replace(".", "/") + ".class")
+
 
 def getVersionFromPaperclip(zip):
     try:
@@ -84,6 +75,17 @@ def getPaperRecommendedVersion(zip):
         return "Java 11"
     elif major >= 1 and minor >= 8:
         return "Java 8"
+
+def getJavaVersion(zip):
+    max_version = 0
+    for x in zip.namelist():
+        if (x.startswith("net/minecraft/") or x.startswith("io/")) and x.endswith(".class"):
+            max_version = max(max_version, readClassHeader(zip, x))
+    if max_version != 0:
+        return max_version
+    manifest_data = zip.read("META-INF/MANIFEST.MF").decode()
+    main_class_path = getHeader(manifest_data, "Main-Class")
+    return readClassHeader(zip, main_class_path.replace(".", "/") + ".class")
 
 def getJavaName(zip):
     # try:
