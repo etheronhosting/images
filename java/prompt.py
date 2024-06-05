@@ -64,7 +64,7 @@ def getVersionFromPaperclip(zip):
     try:
         with zip.open("version.json") as version_json:
             version_contents = version_json.read().decode()
-            return json.loads(version_contents)["java_version"]
+            return json.loads(version_contents)["id"]
     except Exception as e:
         logging.debug(f"Error reading version.json: {e}")
 
@@ -74,7 +74,7 @@ def getPaperRecommendedVersion(zip):
         return
     splitted = list(map(int, version.split(".")))
     major, minor = [splitted[0], splitted[1]]
-    if major >= 1 and minor >= 21:
+    if major >= 1 and minor >= 20:
         return "Java 21"
     if major >= 1 and minor >= 17:
         return "Java 17"
